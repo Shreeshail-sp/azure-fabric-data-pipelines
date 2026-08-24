@@ -97,11 +97,60 @@
 									}
 								}
 							]
+						},
+						{
+							"name": "Append variable1",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "Copy data1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vMetadataRows",
+								"value": {
+									"value": "@activity('Copy data1').output",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Append variable1_copy1",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "Copy data1",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vMetadataRows",
+								"value": {
+									"value": "@activity('Copy data1').output",
+									"type": "Expression"
+								}
+							}
 						}
 					]
 				}
 			}
 		],
+		"variables": {
+			"vMetadataRows": {
+				"type": "Array"
+			},
+			"vRunId": {
+				"type": "String",
+				"defaultValue": "@pipeline().RunId"
+			}
+		},
 		"annotations": []
 	}
 }
