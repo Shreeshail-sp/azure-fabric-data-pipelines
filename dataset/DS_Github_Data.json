@@ -1,0 +1,22 @@
+{
+	"name": "DS_Github_Data",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_GitHub_HTTP",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "HttpServerLocation",
+				"relativeUrl": "media/Shreeshail-sp/azure-fabric-data-pipelines/main/data/"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}
