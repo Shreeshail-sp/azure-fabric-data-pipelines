@@ -33,7 +33,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@json(activity('Web_Get_GitHub_Files').output.Response)",
+						"value": "@activity('Web_Get_GitHub_Files').output",
 						"type": "Expression"
 					},
 					"isSequential": true,
@@ -64,7 +64,7 @@
 									"type": "DelimitedTextSink",
 									"storeSettings": {
 										"type": "AzureBlobFSWriteSettings",
-										"copyBehavior": "PreserveHierarchy"
+										"copyBehavior": "FlattenHierarchy"
 									},
 									"formatSettings": {
 										"type": "DelimitedTextWriteSettings",
@@ -77,7 +77,13 @@
 							"inputs": [
 								{
 									"referenceName": "DS_GitHub_Data_Folder",
-									"type": "DatasetReference"
+									"type": "DatasetReference",
+									"parameters": {
+										"pFilePath": {
+											"value": "@item().path",
+											"type": "Expression"
+										}
+									}
 								}
 							],
 							"outputs": [
