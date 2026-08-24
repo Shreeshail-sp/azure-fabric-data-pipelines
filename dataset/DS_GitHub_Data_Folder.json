@@ -5,6 +5,11 @@
 			"referenceName": "LS_GitHub_API",
 			"type": "LinkedServiceReference"
 		},
+		"parameters": {
+			"pFilePath": {
+				"type": "string"
+			}
+		},
 		"annotations": [],
 		"type": "RestResource",
 		"typeProperties": {
