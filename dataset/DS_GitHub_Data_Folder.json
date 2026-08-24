@@ -1,0 +1,15 @@
+{
+	"name": "DS_GitHub_Data_Folder",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "LS_GitHub_API",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": "repos/Shreeshail-sp/azure-fabric-data-pipelines/contents/data?ref=main"
+		},
+		"schema": []
+	}
+}
