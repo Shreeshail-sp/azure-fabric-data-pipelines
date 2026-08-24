@@ -142,11 +142,35 @@
 				}
 			},
 			{
-				"name": "Create_Metadata_File",
-				"type": "WebActivity",
+				"name": "Set variable1",
+				"type": "SetVariable",
 				"dependsOn": [
 					{
 						"activity": "Iterate_Through_All_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vMetadataCsv",
+					"value": {
+						"value": "@join(variables('vMetadataRows'), '\\n')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Copy_Metadata_CSV",
+				"type": "Copy",
+				"dependsOn": [
+					{
+						"activity": "Set variable1",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -161,15 +185,7 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"method": "PUT",
-					"url": "https://practicefullload.dfs.core.windows.net/raw/metadata/metadata.csv?resource=file",
-					"body": {
-						"value": "@variables('vMetadataCsv')",
-						"type": "Expression"
-					},
-					"authentication": {
-						"type": "MSI"
-					}
+					"enableStaging": false
 				}
 			}
 		],
