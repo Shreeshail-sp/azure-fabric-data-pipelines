@@ -99,7 +99,7 @@
 							]
 						},
 						{
-							"name": "Append variable1",
+							"name": "Append_On_Success",
 							"type": "AppendVariable",
 							"dependsOn": [
 								{
@@ -113,13 +113,13 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@json(concat(\n'{',\n'\"runId\":\"', pipeline().RunId, '\",',\n'\"fileName\":\"', item().name, '\",',\n'\"filePath\":\"', item().path, '\",',\n'\"status\":\"Succeeded\",',\n'\"errorMessage\":\"\"',\n'}'\n))",
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
 									"type": "Expression"
 								}
 							}
 						},
 						{
-							"name": "Append variable1_copy1",
+							"name": "Append_On_Failure",
 							"type": "AppendVariable",
 							"dependsOn": [
 								{
@@ -133,12 +133,35 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@json(concat(\n'{',\n'\"runId\":\"', pipeline().RunId, '\",',\n'\"fileName\":\"', item().name, '\",',\n'\"filePath\":\"', item().path, '\",',\n'\"status\":\"Failed\",',\n'\"errorMessage\":\"Copy failed\"',\n'}'\n))",
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Failed,',\n    '0,',\n    '0,',\n    '0,',\n    activity('Copy data1').error.message,\n    ',',\n    utcnow()\n)",
 									"type": "Expression"
 								}
 							}
 						}
 					]
+				}
+			},
+			{
+				"name": "Create_Metadata_File",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Iterate_Through_All_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "PUT"
 				}
 			}
 		],
