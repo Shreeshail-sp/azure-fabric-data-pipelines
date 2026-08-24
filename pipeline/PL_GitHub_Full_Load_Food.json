@@ -149,6 +149,9 @@
 			"vRunId": {
 				"type": "String",
 				"defaultValue": "@pipeline().RunId"
+			},
+			"vMetadataCsv": {
+				"type": "String"
 			}
 		},
 		"annotations": []
