@@ -113,7 +113,7 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@activity('Copy data1').output",
+									"value": "@json(concat(\n'{',\n'\"runId\":\"', pipeline().RunId, '\",',\n'\"fileName\":\"', item().name, '\",',\n'\"filePath\":\"', item().path, '\",',\n'\"status\":\"Succeeded\",',\n'\"errorMessage\":\"\"',\n'}'\n))",
 									"type": "Expression"
 								}
 							}
@@ -133,7 +133,7 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@activity('Copy data1').output",
+									"value": "@json(concat(\n'{',\n'\"runId\":\"', pipeline().RunId, '\",',\n'\"fileName\":\"', item().name, '\",',\n'\"filePath\":\"', item().path, '\",',\n'\"status\":\"Failed\",',\n'\"errorMessage\":\"Copy failed\"',\n'}'\n))",
 									"type": "Expression"
 								}
 							}
