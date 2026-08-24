@@ -62,7 +62,7 @@
 				]
 			},
 			{
-				"name": "Lookup1",
+				"name": "Lookup_GitHub_Data_Files",
 				"type": "Lookup",
 				"dependsOn": [],
 				"policy": {
@@ -72,22 +72,18 @@
 					"secureOutput": false,
 					"secureInput": false
 				},
+				"userProperties": []
+			},
+			{
+				"name": "PL_GitHub_Full_Load",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
 				"userProperties": [],
 				"typeProperties": {
-					"source": {
-						"type": "DelimitedTextSource",
-						"storeSettings": {
-							"type": "HttpReadSettings",
-							"requestMethod": "GET"
-						},
-						"formatSettings": {
-							"type": "DelimitedTextReadSettings"
-						}
-					},
-					"dataset": {
-						"referenceName": "DS_Github_Data",
-						"type": "DatasetReference"
-					}
+					"waitOnCompletion": true
 				}
 			}
 		],
