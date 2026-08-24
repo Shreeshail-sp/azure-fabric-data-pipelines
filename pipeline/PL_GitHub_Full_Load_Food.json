@@ -161,7 +161,15 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
-					"method": "PUT"
+					"method": "PUT",
+					"url": "https://practicefullload.dfs.core.windows.net/raw/metadata/metadata.csv?resource=file",
+					"body": {
+						"value": "@variables('vMetadataCsv')",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI"
+					}
 				}
 			}
 		],
