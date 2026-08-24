@@ -18,7 +18,9 @@
 				"fileName": {
 					"value": "@dataset().pFileName",
 					"type": "Expression"
-				}
+				},
+				"folderPath": "github_bronze",
+				"fileSystem": "datastorage"
 			},
 			"columnDelimiter": ",",
 			"escapeChar": "\\",
