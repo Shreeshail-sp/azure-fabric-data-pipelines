@@ -64,7 +64,7 @@
 									"type": "DelimitedTextSink",
 									"storeSettings": {
 										"type": "AzureBlobFSWriteSettings",
-										"copyBehavior": "FlattenHierarchy"
+										"copyBehavior": "PreserveHierarchy"
 									},
 									"formatSettings": {
 										"type": "DelimitedTextWriteSettings",
@@ -89,7 +89,13 @@
 							"outputs": [
 								{
 									"referenceName": "DS_ADLS_Food",
-									"type": "DatasetReference"
+									"type": "DatasetReference",
+									"parameters": {
+										"pFileName": {
+											"value": "@item().path",
+											"type": "Expression"
+										}
+									}
 								}
 							]
 						}
