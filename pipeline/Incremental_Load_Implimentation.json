@@ -18,6 +18,44 @@
 					"method": "GET",
 					"url": "https://api.github.com/repos/Shreeshail-sp/azure-fabric-data-pipelines/contents/data?ref=main"
 				}
+			},
+			{
+				"name": "Lookup_Watermark",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "Incremental_Load_Web_Activity",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "DS_Github_Watermark",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
 			}
 		],
 		"annotations": []
