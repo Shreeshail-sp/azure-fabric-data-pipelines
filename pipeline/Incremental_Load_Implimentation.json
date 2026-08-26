@@ -146,6 +146,26 @@
 												}
 											}
 										]
+									},
+									{
+										"name": "Append_On_Success",
+										"type": "AppendVariable",
+										"dependsOn": [
+											{
+												"activity": "Copy data1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vMetadataRows",
+											"value": {
+												"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
+												"type": "Expression"
+											}
+										}
 									}
 								]
 							}
