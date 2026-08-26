@@ -56,8 +56,150 @@
 					},
 					"firstRowOnly": false
 				}
+			},
+			{
+				"name": "Iterate_Through_All_Files",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup_Watermark",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@json(activity('Web_Get_GitHub_Files').output.Response)",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Copy data1",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "RestSource",
+									"httpRequestTimeout": "00:01:40",
+									"requestInterval": "00.00:00:00.010",
+									"requestMethod": "GET",
+									"paginationRules": {
+										"supportRFC5988": "true"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "DS_GitHub_Data_Folder",
+									"type": "DatasetReference",
+									"parameters": {
+										"pFilePath": {
+											"value": "@item().path",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "DS_ADLS_Food",
+									"type": "DatasetReference",
+									"parameters": {
+										"pFileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Append_On_Success",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "Copy data1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vMetadataRows",
+								"value": {
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Append_On_Failure",
+							"type": "AppendVariable",
+							"dependsOn": [
+								{
+									"activity": "Copy data1",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vMetadataRows",
+								"value": {
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Failed,',\n    '0,',\n    '0,',\n    '0,',\n    activity('Copy data1').error.message,\n    ',',\n    utcnow()\n)",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "If_File_Changed",
+							"type": "IfCondition",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@not(\n    equals(\n        item().sha,\n        first(\n            filter(\n                activity('Lookup_GitHub_Watermark').output.value,\n                equals(item().FileName, item().name)\n            )\n        ).SHA\n    )\n)",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
 			}
 		],
+		"variables": {
+			"vCurrentFileName": {
+				"type": "String"
+			},
+			"vCurrentSHA": {
+				"type": "String"
+			}
+		},
 		"annotations": []
 	}
 }
