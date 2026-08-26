@@ -1,0 +1,25 @@
+{
+	"name": "Incremental_Load_Implimentation",
+	"properties": {
+		"activities": [
+			{
+				"name": "Incremental_Load_Web_Activity",
+				"type": "WebActivity",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"url": "https://api.github.com/repos/Shreeshail-sp/azure-fabric-data-pipelines/contents/data?ref=main"
+				}
+			}
+		],
+		"annotations": []
+	}
+}
