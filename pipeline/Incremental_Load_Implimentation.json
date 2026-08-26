@@ -98,6 +98,20 @@
 									"type": "Expression"
 								}
 							}
+						},
+						{
+							"name": "Set_Current_File_SHA",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vCurrentSHA",
+								"value": "@item().sha"
+							}
 						}
 					]
 				}
