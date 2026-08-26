@@ -79,7 +79,14 @@
 						{
 							"name": "If_File_Changed",
 							"type": "IfCondition",
-							"dependsOn": [],
+							"dependsOn": [
+								{
+									"activity": "Filter_Watermark_Current_File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
 							"userProperties": [],
 							"typeProperties": {
 								"expression": {
@@ -190,7 +197,14 @@
 						{
 							"name": "Set_Current_File_SHA",
 							"type": "SetVariable",
-							"dependsOn": [],
+							"dependsOn": [
+								{
+									"activity": "Set_Current_File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
 							"policy": {
 								"secureOutput": false,
 								"secureInput": false
@@ -200,8 +214,95 @@
 								"variableName": "vCurrentSHA",
 								"value": "@item().sha"
 							}
+						},
+						{
+							"name": "Filter_Watermark_Current_File",
+							"type": "Filter",
+							"dependsOn": [
+								{
+									"activity": "Set_Current_File_SHA",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"items": {
+									"value": "@activity('Lookup_Watermark').output.value",
+									"type": "Expression"
+								},
+								"condition": {
+									"value": "@equals(item().FileName, variables('vCurrentFileName'))",
+									"type": "Expression"
+								}
+							}
 						}
 					]
+				}
+			},
+			{
+				"name": "Set variable1",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Iterate_Through_All_Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vMetadataCsv",
+					"value": {
+						"value": "@join(variables('vMetadataRows'), decodeUriComponent('%0A'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Write_Metadata_Log_To_Blob",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set variable1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "PUT",
+					"headers": {
+						"x-ms-blob-type": "BlockBlob",
+						"x-ms-version": "2021-08-06",
+						"Content-Type": "text/csv"
+					},
+					"url": {
+						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/logs/', formatDateTime(utcnow(), 'yyyy-MM-dd'), '/', pipeline().RunId, '.csv')",
+						"type": "Expression"
+					},
+					"body": {
+						"value": "@concat('RunId,FileName,FilePath,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv'))",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
 				}
 			}
 		],
