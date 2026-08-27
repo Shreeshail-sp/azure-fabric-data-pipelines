@@ -264,106 +264,6 @@
 												"type": "Expression"
 											}
 										}
-									},
-									{
-										"name": "Read_Existing_Metadata_copy1",
-										"description": "GET the metadata CSV as raw text. File is guaranteed to exist (Full Load created it).",
-										"type": "WebActivity",
-										"dependsOn": [
-											{
-												"activity": "Set_Metadata_CSV_copy1",
-												"dependencyConditions": [
-													"Succeeded"
-												]
-											}
-										],
-										"policy": {
-											"timeout": "0.12:00:00",
-											"retry": 0,
-											"retryIntervalInSeconds": 30,
-											"secureOutput": false,
-											"secureInput": false
-										},
-										"userProperties": [],
-										"typeProperties": {
-											"method": "GET",
-											"headers": {
-												"x-ms-version": "2021-08-06"
-											},
-											"url": {
-												"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
-												"type": "Expression"
-											},
-											"authentication": {
-												"type": "MSI",
-												"resource": "https://storage.azure.com/"
-											}
-										}
-									},
-									{
-										"name": "Write_Metadata_To_Blob_copy1",
-										"description": "Append only the Copied rows to the existing metadata CSV. Skipped files are not recorded.",
-										"type": "WebActivity",
-										"dependsOn": [
-											{
-												"activity": "Read_Existing_Metadata_copy1",
-												"dependencyConditions": [
-													"Succeeded"
-												]
-											}
-										],
-										"policy": {
-											"timeout": "0.12:00:00",
-											"retry": 1,
-											"retryIntervalInSeconds": 30,
-											"secureOutput": false,
-											"secureInput": false
-										},
-										"userProperties": [],
-										"typeProperties": {
-											"method": "PUT",
-											"headers": {
-												"x-ms-blob-type": "BlockBlob",
-												"x-ms-version": "2021-08-06",
-												"Content-Type": "text/csv"
-											},
-											"url": {
-												"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
-												"type": "Expression"
-											},
-											"body": {
-												"value": "@concat(activity('Read_Existing_Metadata').output.Response, decodeUriComponent('%0A'), variables('vMetadataCsv'))",
-												"type": "Expression"
-											},
-											"authentication": {
-												"type": "MSI",
-												"resource": "https://storage.azure.com/"
-											}
-										}
-									},
-									{
-										"name": "Set_Metadata_CSV_copy1",
-										"type": "SetVariable",
-										"dependsOn": [
-											{
-												"activity": "Track_Copied_File",
-												"dependencyConditions": [
-													"Succeeded"
-												]
-											}
-										],
-										"policy": {
-											"secureOutput": false,
-											"secureInput": false
-										},
-										"userProperties": [],
-										"typeProperties": {
-											"variableName": "vMetadataCsv",
-											"value": {
-												"value": "@join(variables('vMetadataRows'), decodeUriComponent('%0A'))",
-												"type": "Expression"
-											}
-										}
 									}
 								]
 							}
@@ -374,8 +274,6 @@
 			{
 				"name": "Set_Metadata_CSV",
 				"type": "SetVariable",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Iterate_Through_All_Files",
@@ -401,8 +299,6 @@
 				"name": "If_Any_File_Copied",
 				"description": "Only proceed to read + write metadata if at least one file was actually copied to ADLS. If all files were skipped (no changes), do nothing.",
 				"type": "IfCondition",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Set_Metadata_CSV",
