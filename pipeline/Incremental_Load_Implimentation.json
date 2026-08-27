@@ -71,7 +71,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@activity('Incremental_Load_Web_Activity').output.Response",
+						"value": "@json(activity('Incremental_Load_Web_Activity').output.Response)",
 						"type": "Expression"
 					},
 					"isSequential": true,
