@@ -122,7 +122,7 @@
 						},
 						{
 							"name": "Filter_Metadata_Current_File",
-							"description": "Filter all metadata history rows for the current file name. May return multiple rows (one per run). We'll use the LAST entry's SHA as the watermark.",
+							"description": "Filter all metadata history rows for the current file. Use last entry's SHA as watermark.",
 							"type": "Filter",
 							"dependsOn": [
 								{
@@ -146,7 +146,7 @@
 						},
 						{
 							"name": "If_File_Changed",
-							"description": "Compare GitHub SHA with the LAST entry for this file in metadata. If no history entry for the file (new file added to repo after full load) → copy it. If SHA differs → copy. If SHA matches → skip.",
+							"description": "Compare GitHub SHA with the last recorded SHA in metadata. New file (no history) or changed SHA → copy. Same SHA → skip (no metadata written for skipped files).",
 							"type": "IfCondition",
 							"dependsOn": [
 								{
@@ -162,21 +162,6 @@
 									"value": "@if(\n    equals(activity('Filter_Metadata_Current_File').output.FilteredItemsCount, 0),\n    true,\n    not(equals(\n        variables('vCurrentSHA'),\n        last(activity('Filter_Metadata_Current_File').output.value).SHA\n    ))\n)",
 									"type": "Expression"
 								},
-								"ifFalseActivities": [
-									{
-										"name": "Append_Metadata_Skipped",
-										"type": "AppendVariable",
-										"dependsOn": [],
-										"userProperties": [],
-										"typeProperties": {
-											"variableName": "vMetadataRows",
-											"value": {
-												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',', item().sha, ',Skipped,0,0,0,,', utcnow())",
-												"type": "Expression"
-											}
-										}
-									}
-								],
 								"ifTrueActivities": [
 									{
 										"name": "Copy_Changed_File",
@@ -240,6 +225,7 @@
 									},
 									{
 										"name": "Append_Metadata_Copied",
+										"description": "Add a metadata row for this successfully copied file.",
 										"type": "AppendVariable",
 										"dependsOn": [
 											{
@@ -254,6 +240,127 @@
 											"variableName": "vMetadataRows",
 											"value": {
 												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',', item().sha, ',Copied,', string(activity('Copy_Changed_File').output.rowsCopied), ',', string(activity('Copy_Changed_File').output.dataRead), ',', string(activity('Copy_Changed_File').output.dataWritten), ',,', utcnow())",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Track_Copied_File",
+										"description": "Track that at least one file was successfully copied. vCopiedCount length is checked after ForEach to decide whether to write metadata.",
+										"type": "AppendVariable",
+										"dependsOn": [
+											{
+												"activity": "Append_Metadata_Copied",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vCopiedCount",
+											"value": {
+												"value": "@item().name",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Read_Existing_Metadata_copy1",
+										"description": "GET the metadata CSV as raw text. File is guaranteed to exist (Full Load created it).",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Set_Metadata_CSV_copy1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 0,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"method": "GET",
+											"headers": {
+												"x-ms-version": "2021-08-06"
+											},
+											"url": {
+												"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+												"type": "Expression"
+											},
+											"authentication": {
+												"type": "MSI",
+												"resource": "https://storage.azure.com/"
+											}
+										}
+									},
+									{
+										"name": "Write_Metadata_To_Blob_copy1",
+										"description": "Append only the Copied rows to the existing metadata CSV. Skipped files are not recorded.",
+										"type": "WebActivity",
+										"dependsOn": [
+											{
+												"activity": "Read_Existing_Metadata_copy1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"timeout": "0.12:00:00",
+											"retry": 1,
+											"retryIntervalInSeconds": 30,
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"method": "PUT",
+											"headers": {
+												"x-ms-blob-type": "BlockBlob",
+												"x-ms-version": "2021-08-06",
+												"Content-Type": "text/csv"
+											},
+											"url": {
+												"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+												"type": "Expression"
+											},
+											"body": {
+												"value": "@concat(activity('Read_Existing_Metadata').output.Response, decodeUriComponent('%0A'), variables('vMetadataCsv'))",
+												"type": "Expression"
+											},
+											"authentication": {
+												"type": "MSI",
+												"resource": "https://storage.azure.com/"
+											}
+										}
+									},
+									{
+										"name": "Set_Metadata_CSV_copy1",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "Track_Copied_File",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vMetadataCsv",
+											"value": {
+												"value": "@join(variables('vMetadataRows'), decodeUriComponent('%0A'))",
 												"type": "Expression"
 											}
 										}
@@ -289,9 +396,9 @@
 				}
 			},
 			{
-				"name": "Read_Existing_Metadata",
-				"description": "GET the metadata CSV as raw text so we can append new rows to it. File is guaranteed to exist (Full Load created it).",
-				"type": "WebActivity",
+				"name": "If_Any_File_Copied",
+				"description": "Only proceed to read + write metadata if at least one file was actually copied to ADLS. If all files were skipped (no changes), do nothing.",
+				"type": "IfCondition",
 				"dependsOn": [
 					{
 						"activity": "Set_Metadata_CSV",
@@ -300,68 +407,83 @@
 						]
 					}
 				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 0,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
 				"userProperties": [],
 				"typeProperties": {
-					"method": "GET",
-					"headers": {
-						"x-ms-version": "2021-08-06"
-					},
-					"url": {
-						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+					"expression": {
+						"value": "@greater(length(variables('vCopiedCount')), 0)",
 						"type": "Expression"
 					},
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://storage.azure.com/"
-					}
-				}
-			},
-			{
-				"name": "Write_Metadata_To_Blob",
-				"description": "Append new incremental run rows to the existing metadata CSV. No header needed — file already has it from Full Load.",
-				"type": "WebActivity",
-				"dependsOn": [
-					{
-						"activity": "Read_Existing_Metadata",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 1,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"method": "PUT",
-					"headers": {
-						"x-ms-blob-type": "BlockBlob",
-						"x-ms-version": "2021-08-06",
-						"Content-Type": "text/csv"
-					},
-					"url": {
-						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
-						"type": "Expression"
-					},
-					"body": {
-						"value": "@concat(activity('Read_Existing_Metadata').output.Response, decodeUriComponent('%0A'), variables('vMetadataCsv'))",
-						"type": "Expression"
-					},
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://storage.azure.com/"
-					}
+					"ifTrueActivities": [
+						{
+							"name": "Read_Existing_Metadata",
+							"description": "GET the metadata CSV as raw text. File is guaranteed to exist (Full Load created it).",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "GET",
+								"headers": {
+									"x-ms-version": "2021-08-06"
+								},
+								"url": {
+									"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						},
+						{
+							"name": "Write_Metadata_To_Blob",
+							"description": "Append only the Copied rows to the existing metadata CSV. Skipped files are not recorded.",
+							"type": "WebActivity",
+							"dependsOn": [
+								{
+									"activity": "Read_Existing_Metadata",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 1,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "PUT",
+								"headers": {
+									"x-ms-blob-type": "BlockBlob",
+									"x-ms-version": "2021-08-06",
+									"Content-Type": "text/csv"
+								},
+								"url": {
+									"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+									"type": "Expression"
+								},
+								"body": {
+									"value": "@concat(activity('Read_Existing_Metadata').output.Response, decodeUriComponent('%0A'), variables('vMetadataCsv'))",
+									"type": "Expression"
+								},
+								"authentication": {
+									"type": "MSI",
+									"resource": "https://storage.azure.com/"
+								}
+							}
+						}
+					]
 				}
 			}
 		],
@@ -391,6 +513,9 @@
 			},
 			"vMetadataCsv": {
 				"type": "String"
+			},
+			"vCopiedCount": {
+				"type": "Array"
 			}
 		},
 		"annotations": []
