@@ -113,7 +113,7 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',',\n    item().sha,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
 									"type": "Expression"
 								}
 							}
@@ -133,7 +133,7 @@
 							"typeProperties": {
 								"variableName": "vMetadataRows",
 								"value": {
-									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Failed,',\n    '0,',\n    '0,',\n    '0,',\n    activity('Copy data1').error.message,\n    ',',\n    utcnow()\n)",
+									"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',',\n    item().sha,\n    ',Failed,',\n    '0,',\n    '0,',\n    '0,',\n    activity('Copy data1').error.message,\n    ',',\n    utcnow()\n)",
 									"type": "Expression"
 								}
 							}
@@ -167,7 +167,7 @@
 			},
 			{
 				"name": "Read_Existing_Metadata",
-				"description": "Try to GET the existing metadata CSV from blob. If the file exists, output.Response contains CSV text. If not (404), the activity fails — which is expected and handled.",
+				"description": "Try to GET the existing metadata CSV from blob.",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
@@ -202,7 +202,7 @@
 			},
 			{
 				"name": "Set_Existing_Content",
-				"description": "File exists — capture the existing CSV content from the GET response.",
+				"description": "File exists — capture existing CSV content.",
 				"type": "SetVariable",
 				"dependsOn": [
 					{
@@ -227,7 +227,7 @@
 			},
 			{
 				"name": "Set_Existing_Empty",
-				"description": "File does NOT exist (GET returned 404) — set existing content to empty string so we know to add the header row.",
+				"description": "File doesn't exist — set empty to trigger header row creation.",
 				"type": "SetVariable",
 				"dependsOn": [
 					{
@@ -252,7 +252,7 @@
 			},
 			{
 				"name": "Write_Metadata_To_Blob",
-				"description": "Write the combined metadata (existing + new rows) to a SINGLE persistent CSV file. If the file is new, the header row is included. If the file existed, new rows are appended below existing data.",
+				"description": "Write combined metadata to single persistent CSV. Same file used by Incremental Load for SHA-based change detection.",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
@@ -290,7 +290,7 @@
 						"type": "Expression"
 					},
 					"body": {
-						"value": "@if(\n    equals(variables('vExistingContent'), ''),\n    concat('RunId,FileName,FilePath,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv')),\n    concat(variables('vExistingContent'), decodeUriComponent('%0A'), variables('vMetadataCsv'))\n)",
+						"value": "@if(\n    equals(variables('vExistingContent'), ''),\n    concat('RunId,FileName,FilePath,SHA,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv')),\n    concat(variables('vExistingContent'), decodeUriComponent('%0A'), variables('vMetadataCsv'))\n)",
 						"type": "Expression"
 					},
 					"authentication": {
@@ -317,10 +317,6 @@
 		"variables": {
 			"vMetadataRows": {
 				"type": "Array"
-			},
-			"vRunId": {
-				"type": "String",
-				"defaultValue": "@pipeline().RunId"
 			},
 			"vMetadataCsv": {
 				"type": "String"
