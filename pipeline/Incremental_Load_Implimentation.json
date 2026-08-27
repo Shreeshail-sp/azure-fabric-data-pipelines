@@ -411,11 +411,10 @@
 					"headers": {
 						"x-ms-blob-type": "BlockBlob",
 						"x-ms-version": "2021-08-06",
-						"Content-Type": "text/csv",
-						"Content-Length": "@string(length(concat('FileName,SHA', decodeUriComponent('%0A'), variables('vWatermarkCsv'))))"
+						"Content-Type": "text/csv"
 					},
 					"url": {
-						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.dfs.core.windows.net/', pipeline().parameters.pWatermarkContainer, '/watermark/github_watermark.csv')",
+						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pWatermarkContainer, '/watermark/github_watermark.csv')",
 						"type": "Expression"
 					},
 					"body": {
