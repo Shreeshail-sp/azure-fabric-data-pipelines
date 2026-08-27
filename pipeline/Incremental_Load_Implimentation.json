@@ -348,13 +348,107 @@
 				}
 			},
 			{
-				"name": "Write_Metadata_Log_To_Blob",
+				"name": "Read_Existing_Metadata",
+				"description": "Try to GET the existing metadata CSV. If file exists (200), output.Response has the CSV text. If not (404), activity fails — handled by Set_Existing_Empty.",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
 						"activity": "Set_Watermark_CSV",
 						"dependencyConditions": [
 							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "GET",
+					"headers": {
+						"x-ms-version": "2021-08-06"
+					},
+					"url": {
+						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
+				}
+			},
+			{
+				"name": "Set_Existing_Content",
+				"description": "File exists — capture existing CSV content.",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Read_Existing_Metadata",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vExistingContent",
+					"value": {
+						"value": "@activity('Read_Existing_Metadata').output.Response",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Set_Existing_Empty",
+				"description": "File does NOT exist (404) — set to empty so header row gets added.",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Read_Existing_Metadata",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vExistingContent",
+					"value": {
+						"value": "@string('')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "Write_Metadata_To_Blob",
+				"description": "Write combined metadata (existing + new) to a single persistent CSV. Adds header only on first run.",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Set_Existing_Content",
+						"dependencyConditions": [
+							"Succeeded",
+							"Skipped"
+						]
+					},
+					{
+						"activity": "Set_Existing_Empty",
+						"dependencyConditions": [
+							"Succeeded",
+							"Skipped"
 						]
 					}
 				],
@@ -374,11 +468,11 @@
 						"Content-Type": "text/csv"
 					},
 					"url": {
-						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/logs/', formatDateTime(utcnow(), 'yyyy-MM-dd'), '/', pipeline().RunId, '.csv')",
+						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pLogContainer, '/', pipeline().parameters.pMetadataFilePath)",
 						"type": "Expression"
 					},
 					"body": {
-						"value": "@concat('RunId,FileName,FilePath,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv'))",
+						"value": "@if(\n    equals(variables('vExistingContent'), ''),\n    concat('RunId,FileName,FilePath,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv')),\n    concat(variables('vExistingContent'), decodeUriComponent('%0A'), variables('vMetadataCsv'))\n)",
 						"type": "Expression"
 					},
 					"authentication": {
@@ -389,10 +483,11 @@
 			},
 			{
 				"name": "Update_Watermark_File",
+				"description": "Overwrite the watermark CSV with latest SHA values. Watermark is always a full snapshot, not append.",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
-						"activity": "Write_Metadata_Log_To_Blob",
+						"activity": "Write_Metadata_To_Blob",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -440,6 +535,10 @@
 			"pWatermarkContainer": {
 				"type": "string",
 				"defaultValue": "datastorage"
+			},
+			"pMetadataFilePath": {
+				"type": "string",
+				"defaultValue": "logs/Meta_Data/pipeline_metadata.csv"
 			}
 		},
 		"variables": {
@@ -459,6 +558,9 @@
 				"type": "Array"
 			},
 			"vWatermarkCsv": {
+				"type": "String"
+			},
+			"vExistingContent": {
 				"type": "String"
 			}
 		},
