@@ -431,15 +431,15 @@
 		"parameters": {
 			"pStorageAccountName": {
 				"type": "string",
-				"defaultValue": "yourstorageaccount"
+				"defaultValue": "practicefullload"
 			},
 			"pLogContainer": {
 				"type": "string",
-				"defaultValue": "metadata"
+				"defaultValue": "datastorage"
 			},
 			"pWatermarkContainer": {
 				"type": "string",
-				"defaultValue": "config"
+				"defaultValue": "datastorage"
 			}
 		},
 		"variables": {
