@@ -374,6 +374,8 @@
 			{
 				"name": "Set_Metadata_CSV",
 				"type": "SetVariable",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Iterate_Through_All_Files",
@@ -399,6 +401,8 @@
 				"name": "If_Any_File_Copied",
 				"description": "Only proceed to read + write metadata if at least one file was actually copied to ADLS. If all files were skipped (no changes), do nothing.",
 				"type": "IfCondition",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "Set_Metadata_CSV",
