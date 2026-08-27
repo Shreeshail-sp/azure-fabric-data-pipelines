@@ -10,6 +10,7 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
+				"fileName": "pipeline_metadata.csv",
 				"folderPath": "logs/Meta_Data",
 				"fileSystem": "datastorage"
 			},
