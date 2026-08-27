@@ -71,11 +71,75 @@
 				"userProperties": [],
 				"typeProperties": {
 					"items": {
-						"value": "@json(activity('Web_Get_GitHub_Files').output.Response)",
+						"value": "@activity('Incremental_Load_Web_Activity').output.Response",
 						"type": "Expression"
 					},
 					"isSequential": true,
 					"activities": [
+						{
+							"name": "Set_Current_File",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vCurrentFileName",
+								"value": {
+									"value": "@item().name",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set_Current_File_SHA",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set_Current_File",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "vCurrentSHA",
+								"value": {
+									"value": "@item().sha",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Filter_Watermark_Current_File",
+							"type": "Filter",
+							"dependsOn": [
+								{
+									"activity": "Set_Current_File_SHA",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"items": {
+									"value": "@activity('Lookup_Watermark').output.value",
+									"type": "Expression"
+								},
+								"condition": {
+									"value": "@equals(item().FileName, variables('vCurrentFileName'))",
+									"type": "Expression"
+								}
+							}
+						},
 						{
 							"name": "If_File_Changed",
 							"type": "IfCondition",
@@ -90,12 +154,47 @@
 							"userProperties": [],
 							"typeProperties": {
 								"expression": {
-									"value": "@not(equals(\n    variables('vCurrentSHA'),\n    first(\n        filter(\n            activity('Lookup_GitHub_Watermark').output.value,\n            equals(item().FileName, variables('vCurrentFileName'))\n        )\n    ).SHA\n))",
+									"value": "@if(equals(activity('Filter_Watermark_Current_File').output.FilteredItemsCount, 0), true, not(equals(variables('vCurrentSHA'), activity('Filter_Watermark_Current_File').output.value[0].SHA)))",
 									"type": "Expression"
 								},
+								"ifFalseActivities": [
+									{
+										"name": "Append_Metadata_Skipped",
+										"type": "AppendVariable",
+										"dependsOn": [],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vMetadataRows",
+											"value": {
+												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',Skipped,0,0,0,,', utcnow())",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Append_Watermark_Unchanged",
+										"type": "AppendVariable",
+										"dependsOn": [
+											{
+												"activity": "Append_Metadata_Skipped",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vUpdatedWatermarkRows",
+											"value": {
+												"value": "@concat(item().name, ',', item().sha)",
+												"type": "Expression"
+											}
+										}
+									}
+								],
 								"ifTrueActivities": [
 									{
-										"name": "Copy data1",
+										"name": "Copy_Changed_File",
 										"type": "Copy",
 										"dependsOn": [],
 										"policy": {
@@ -155,11 +254,11 @@
 										]
 									},
 									{
-										"name": "Append_On_Success",
+										"name": "Append_Metadata_Copied",
 										"type": "AppendVariable",
 										"dependsOn": [
 											{
-												"activity": "Copy data1",
+												"activity": "Copy_Changed_File",
 												"dependencyConditions": [
 													"Succeeded"
 												]
@@ -169,80 +268,39 @@
 										"typeProperties": {
 											"variableName": "vMetadataRows",
 											"value": {
-												"value": "@concat(\n    pipeline().RunId,\n    ',',\n    item().name,\n    ',',\n    item().path,\n    ',Success,',\n    activity('Copy data1').output.rowsCopied,\n    ',',\n    activity('Copy data1').output.dataRead,\n    ',',\n    activity('Copy data1').output.dataWritten,\n    ',,',\n    utcnow()\n)",
+												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',Copied,', string(activity('Copy_Changed_File').output.rowsCopied), ',', string(activity('Copy_Changed_File').output.dataRead), ',', string(activity('Copy_Changed_File').output.dataWritten), ',,', utcnow())",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "Append_Watermark_Entry",
+										"type": "AppendVariable",
+										"dependsOn": [
+											{
+												"activity": "Append_Metadata_Copied",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "vUpdatedWatermarkRows",
+											"value": {
+												"value": "@concat(item().name, ',', item().sha)",
 												"type": "Expression"
 											}
 										}
 									}
 								]
 							}
-						},
-						{
-							"name": "Set_Current_File",
-							"type": "SetVariable",
-							"dependsOn": [],
-							"policy": {
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"variableName": "vCurrentFileName",
-								"value": {
-									"value": "@item().name",
-									"type": "Expression"
-								}
-							}
-						},
-						{
-							"name": "Set_Current_File_SHA",
-							"type": "SetVariable",
-							"dependsOn": [
-								{
-									"activity": "Set_Current_File",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"policy": {
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"variableName": "vCurrentSHA",
-								"value": "@item().sha"
-							}
-						},
-						{
-							"name": "Filter_Watermark_Current_File",
-							"type": "Filter",
-							"dependsOn": [
-								{
-									"activity": "Set_Current_File_SHA",
-									"dependencyConditions": [
-										"Succeeded"
-									]
-								}
-							],
-							"userProperties": [],
-							"typeProperties": {
-								"items": {
-									"value": "@activity('Lookup_Watermark').output.value",
-									"type": "Expression"
-								},
-								"condition": {
-									"value": "@equals(item().FileName, variables('vCurrentFileName'))",
-									"type": "Expression"
-								}
-							}
 						}
 					]
 				}
 			},
 			{
-				"name": "Set variable1",
+				"name": "Set_Metadata_CSV",
 				"type": "SetVariable",
 				"dependsOn": [
 					{
@@ -266,11 +324,35 @@
 				}
 			},
 			{
+				"name": "Set_Watermark_CSV",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "Set_Metadata_CSV",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "vWatermarkCsv",
+					"value": {
+						"value": "@join(variables('vUpdatedWatermarkRows'), decodeUriComponent('%0A'))",
+						"type": "Expression"
+					}
+				}
+			},
+			{
 				"name": "Write_Metadata_Log_To_Blob",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
-						"activity": "Set variable1",
+						"activity": "Set_Watermark_CSV",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -304,13 +386,79 @@
 						"resource": "https://storage.azure.com/"
 					}
 				}
+			},
+			{
+				"name": "Update_Watermark_File",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Write_Metadata_Log_To_Blob",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 1,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "PUT",
+					"headers": {
+						"x-ms-blob-type": "BlockBlob",
+						"x-ms-version": "2021-08-06",
+						"Content-Type": "text/csv"
+					},
+					"url": {
+						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.dfs.core.windows.net/', pipeline().parameters.pWatermarkContainer, '/watermark/github_watermark.csv')",
+						"type": "Expression"
+					},
+					"body": {
+						"value": "@concat('FileName,SHA', decodeUriComponent('%0A'), variables('vWatermarkCsv'))",
+						"type": "Expression"
+					},
+					"authentication": {
+						"type": "MSI",
+						"resource": "https://storage.azure.com/"
+					}
+				}
 			}
 		],
+		"parameters": {
+			"pStorageAccountName": {
+				"type": "string",
+				"defaultValue": "yourstorageaccount"
+			},
+			"pLogContainer": {
+				"type": "string",
+				"defaultValue": "metadata"
+			},
+			"pWatermarkContainer": {
+				"type": "string",
+				"defaultValue": "config"
+			}
+		},
 		"variables": {
 			"vCurrentFileName": {
 				"type": "String"
 			},
 			"vCurrentSHA": {
+				"type": "String"
+			},
+			"vMetadataRows": {
+				"type": "Array"
+			},
+			"vMetadataCsv": {
+				"type": "String"
+			},
+			"vUpdatedWatermarkRows": {
+				"type": "Array"
+			},
+			"vWatermarkCsv": {
 				"type": "String"
 			}
 		},
