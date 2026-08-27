@@ -10,8 +10,8 @@
 		"typeProperties": {
 			"location": {
 				"type": "AzureBlobFSLocation",
-				"fileName": "Github_Watermark",
-				"folderPath": "logs/github_watermark.csv",
+				"fileName": "github_watermark.csv",
+				"folderPath": "watermark",
 				"fileSystem": "datastorage"
 			},
 			"columnDelimiter": ",",
