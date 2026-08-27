@@ -4,6 +4,7 @@
 		"activities": [
 			{
 				"name": "Incremental_Load_Web_Activity",
+				"description": "Fetch current list of files + their SHA hashes from the GitHub repo.",
 				"type": "WebActivity",
 				"dependsOn": [],
 				"policy": {
@@ -20,7 +21,8 @@
 				}
 			},
 			{
-				"name": "Lookup_Watermark",
+				"name": "Lookup_Metadata",
+				"description": "Read the existing metadata CSV (written by Full Load). Used to extract last known SHA per file for change detection. File is guaranteed to exist since Full Load runs first.",
 				"type": "Lookup",
 				"dependsOn": [
 					{
@@ -39,15 +41,31 @@
 				},
 				"userProperties": [],
 				"typeProperties": {
+					"source": {
+						"type": "DelimitedTextSource",
+						"storeSettings": {
+							"type": "AzureBlobFSReadSettings",
+							"recursive": true,
+							"enablePartitionDiscovery": false
+						},
+						"formatSettings": {
+							"type": "DelimitedTextReadSettings"
+						}
+					},
+					"dataset": {
+						"referenceName": "DS_ADLS_Metadata",
+						"type": "DatasetReference"
+					},
 					"firstRowOnly": false
 				}
 			},
 			{
 				"name": "Iterate_Through_All_Files",
+				"description": "Loop over every file returned by GitHub API. For each, check SHA history to decide copy or skip.",
 				"type": "ForEach",
 				"dependsOn": [
 					{
-						"activity": "Lookup_Watermark",
+						"activity": "Lookup_Metadata",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -103,7 +121,8 @@
 							}
 						},
 						{
-							"name": "Filter_Watermark_Current_File",
+							"name": "Filter_Metadata_Current_File",
+							"description": "Filter all metadata history rows for the current file name. May return multiple rows (one per run). We'll use the LAST entry's SHA as the watermark.",
 							"type": "Filter",
 							"dependsOn": [
 								{
@@ -116,7 +135,7 @@
 							"userProperties": [],
 							"typeProperties": {
 								"items": {
-									"value": "@activity('Lookup_Watermark').output.value",
+									"value": "@activity('Lookup_Metadata').output.value",
 									"type": "Expression"
 								},
 								"condition": {
@@ -127,10 +146,11 @@
 						},
 						{
 							"name": "If_File_Changed",
+							"description": "Compare GitHub SHA with the LAST entry for this file in metadata. If no history entry for the file (new file added to repo after full load) → copy it. If SHA differs → copy. If SHA matches → skip.",
 							"type": "IfCondition",
 							"dependsOn": [
 								{
-									"activity": "Filter_Watermark_Current_File",
+									"activity": "Filter_Metadata_Current_File",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -139,7 +159,7 @@
 							"userProperties": [],
 							"typeProperties": {
 								"expression": {
-									"value": "@if(equals(activity('Filter_Watermark_Current_File').output.FilteredItemsCount, 0), true, not(equals(variables('vCurrentSHA'), activity('Filter_Watermark_Current_File').output.value[0].SHA)))",
+									"value": "@if(\n    equals(activity('Filter_Metadata_Current_File').output.FilteredItemsCount, 0),\n    true,\n    not(equals(\n        variables('vCurrentSHA'),\n        last(activity('Filter_Metadata_Current_File').output.value).SHA\n    ))\n)",
 									"type": "Expression"
 								},
 								"ifFalseActivities": [
@@ -151,27 +171,7 @@
 										"typeProperties": {
 											"variableName": "vMetadataRows",
 											"value": {
-												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',Skipped,0,0,0,,', utcnow())",
-												"type": "Expression"
-											}
-										}
-									},
-									{
-										"name": "Append_Watermark_Unchanged",
-										"type": "AppendVariable",
-										"dependsOn": [
-											{
-												"activity": "Append_Metadata_Skipped",
-												"dependencyConditions": [
-													"Succeeded"
-												]
-											}
-										],
-										"userProperties": [],
-										"typeProperties": {
-											"variableName": "vUpdatedWatermarkRows",
-											"value": {
-												"value": "@concat(item().name, ',', item().sha)",
+												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',', item().sha, ',Skipped,0,0,0,,', utcnow())",
 												"type": "Expression"
 											}
 										}
@@ -253,27 +253,7 @@
 										"typeProperties": {
 											"variableName": "vMetadataRows",
 											"value": {
-												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',Copied,', string(activity('Copy_Changed_File').output.rowsCopied), ',', string(activity('Copy_Changed_File').output.dataRead), ',', string(activity('Copy_Changed_File').output.dataWritten), ',,', utcnow())",
-												"type": "Expression"
-											}
-										}
-									},
-									{
-										"name": "Append_Watermark_Entry",
-										"type": "AppendVariable",
-										"dependsOn": [
-											{
-												"activity": "Append_Metadata_Copied",
-												"dependencyConditions": [
-													"Succeeded"
-												]
-											}
-										],
-										"userProperties": [],
-										"typeProperties": {
-											"variableName": "vUpdatedWatermarkRows",
-											"value": {
-												"value": "@concat(item().name, ',', item().sha)",
+												"value": "@concat(pipeline().RunId, ',', item().name, ',', item().path, ',', item().sha, ',Copied,', string(activity('Copy_Changed_File').output.rowsCopied), ',', string(activity('Copy_Changed_File').output.dataRead), ',', string(activity('Copy_Changed_File').output.dataWritten), ',,', utcnow())",
 												"type": "Expression"
 											}
 										}
@@ -309,36 +289,12 @@
 				}
 			},
 			{
-				"name": "Set_Watermark_CSV",
-				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "Set_Metadata_CSV",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "vWatermarkCsv",
-					"value": {
-						"value": "@join(variables('vUpdatedWatermarkRows'), decodeUriComponent('%0A'))",
-						"type": "Expression"
-					}
-				}
-			},
-			{
 				"name": "Read_Existing_Metadata",
-				"description": "Try to GET the existing metadata CSV. If file exists (200), output.Response has the CSV text. If not (404), activity fails — handled by Set_Existing_Empty.",
+				"description": "GET the metadata CSV as raw text so we can append new rows to it. File is guaranteed to exist (Full Load created it).",
 				"type": "WebActivity",
 				"dependsOn": [
 					{
-						"activity": "Set_Watermark_CSV",
+						"activity": "Set_Metadata_CSV",
 						"dependencyConditions": [
 							"Succeeded"
 						]
@@ -368,72 +324,14 @@
 				}
 			},
 			{
-				"name": "Set_Existing_Content",
-				"description": "File exists — capture existing CSV content.",
-				"type": "SetVariable",
+				"name": "Write_Metadata_To_Blob",
+				"description": "Append new incremental run rows to the existing metadata CSV. No header needed — file already has it from Full Load.",
+				"type": "WebActivity",
 				"dependsOn": [
 					{
 						"activity": "Read_Existing_Metadata",
 						"dependencyConditions": [
 							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "vExistingContent",
-					"value": {
-						"value": "@activity('Read_Existing_Metadata').output.Response",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "Set_Existing_Empty",
-				"description": "File does NOT exist (404) — set to empty so header row gets added.",
-				"type": "SetVariable",
-				"dependsOn": [
-					{
-						"activity": "Read_Existing_Metadata",
-						"dependencyConditions": [
-							"Failed"
-						]
-					}
-				],
-				"policy": {
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"variableName": "vExistingContent",
-					"value": {
-						"value": "@string('')",
-						"type": "Expression"
-					}
-				}
-			},
-			{
-				"name": "Write_Metadata_To_Blob",
-				"description": "Write combined metadata (existing + new) to a single persistent CSV. Adds header only on first run.",
-				"type": "WebActivity",
-				"dependsOn": [
-					{
-						"activity": "Set_Existing_Content",
-						"dependencyConditions": [
-							"Succeeded",
-							"Skipped"
-						]
-					},
-					{
-						"activity": "Set_Existing_Empty",
-						"dependencyConditions": [
-							"Succeeded",
-							"Skipped"
 						]
 					}
 				],
@@ -457,48 +355,7 @@
 						"type": "Expression"
 					},
 					"body": {
-						"value": "@if(\n    equals(variables('vExistingContent'), ''),\n    concat('RunId,FileName,FilePath,Status,RowsCopied,DataRead,DataWritten,ErrorMessage,Timestamp', decodeUriComponent('%0A'), variables('vMetadataCsv')),\n    concat(variables('vExistingContent'), decodeUriComponent('%0A'), variables('vMetadataCsv'))\n)",
-						"type": "Expression"
-					},
-					"authentication": {
-						"type": "MSI",
-						"resource": "https://storage.azure.com/"
-					}
-				}
-			},
-			{
-				"name": "Update_Watermark_File",
-				"description": "Overwrite the watermark CSV with latest SHA values. Watermark is always a full snapshot, not append.",
-				"type": "WebActivity",
-				"dependsOn": [
-					{
-						"activity": "Write_Metadata_To_Blob",
-						"dependencyConditions": [
-							"Succeeded"
-						]
-					}
-				],
-				"policy": {
-					"timeout": "0.12:00:00",
-					"retry": 1,
-					"retryIntervalInSeconds": 30,
-					"secureOutput": false,
-					"secureInput": false
-				},
-				"userProperties": [],
-				"typeProperties": {
-					"method": "PUT",
-					"headers": {
-						"x-ms-blob-type": "BlockBlob",
-						"x-ms-version": "2021-08-06",
-						"Content-Type": "text/csv"
-					},
-					"url": {
-						"value": "@concat('https://', pipeline().parameters.pStorageAccountName, '.blob.core.windows.net/', pipeline().parameters.pWatermarkContainer, '/watermark/github_watermark.csv')",
-						"type": "Expression"
-					},
-					"body": {
-						"value": "@concat('FileName,SHA', decodeUriComponent('%0A'), variables('vWatermarkCsv'))",
+						"value": "@concat(activity('Read_Existing_Metadata').output.Response, decodeUriComponent('%0A'), variables('vMetadataCsv'))",
 						"type": "Expression"
 					},
 					"authentication": {
@@ -514,10 +371,6 @@
 				"defaultValue": "practicefullload"
 			},
 			"pLogContainer": {
-				"type": "string",
-				"defaultValue": "datastorage"
-			},
-			"pWatermarkContainer": {
 				"type": "string",
 				"defaultValue": "datastorage"
 			},
@@ -537,15 +390,6 @@
 				"type": "Array"
 			},
 			"vMetadataCsv": {
-				"type": "String"
-			},
-			"vUpdatedWatermarkRows": {
-				"type": "Array"
-			},
-			"vWatermarkCsv": {
-				"type": "String"
-			},
-			"vExistingContent": {
 				"type": "String"
 			}
 		},
