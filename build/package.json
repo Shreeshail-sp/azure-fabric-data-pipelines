@@ -1,0 +1,12 @@
+{
+	"name": "azure-fabric-data-pipelines-build",
+	"description": "Build/validation tooling for the Azure Data Factory resources in this repository.",
+	"private": true,
+	"scripts": {
+		"build": "node node_modules/@microsoft/azure-data-factory-utilities/lib/index",
+		"build-preview": "node node_modules/@microsoft/azure-data-factory-utilities/lib/index --preview"
+	},
+	"dependencies": {
+		"@microsoft/azure-data-factory-utilities": "^1.0.3"
+	}
+}
