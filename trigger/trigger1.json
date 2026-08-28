@@ -1,0 +1,33 @@
+{
+	"name": "trigger1",
+	"properties": {
+		"annotations": [],
+		"runtimeState": "Started",
+		"pipelines": [
+			{
+				"pipelineReference": {
+					"referenceName": "Incremental_Load_Implimentation",
+					"type": "PipelineReference"
+				}
+			}
+		],
+		"type": "ScheduleTrigger",
+		"typeProperties": {
+			"recurrence": {
+				"frequency": "Day",
+				"interval": 15,
+				"startTime": "2026-09-01T12:12:00",
+				"endTime": "2026-10-02T04:41:45",
+				"timeZone": "India Standard Time",
+				"schedule": {
+					"minutes": [
+						12
+					],
+					"hours": [
+						12
+					]
+				}
+			}
+		}
+	}
+}
