@@ -1,0 +1,4 @@
+{
+	"name": "Azure Data Factory pipelines",
+	"install": "cd build && npm install"
+}
